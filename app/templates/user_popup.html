@@ -1,0 +1,26 @@
+<div class="user-popup p-3">
+  <div class="d-flex align-items-center mb-2">
+      <img src="{{ user.avatar(64) }}" alt="{{ user.username }}'s avatar" class="avatar me-3">
+      <div>
+          <p class="mb-1"><a href="{{ url_for('main.user', username=user.username) }}" class="fw-bold text-decoration-none">{{ user.username }}</a></p>
+          {% if user.about_me %}<p class="small text-muted mb-1">{{ user.about_me }}</p>{% endif %}
+      </div>
+  </div>
+  {% if user.last_seen %}
+  <p class="small text-muted">{{ _('Last seen on') }}: {{ moment(user.last_seen).format('lll') }}</p>
+  {% endif %}
+  <p class="small text-muted">{{ _('%(count)d followers', count=user.followers_count()) }}, {{ _('%(count)d following', count=user.following_count()) }}</p>
+  {% if user != current_user %}
+      {% if not current_user.is_following(user) %}
+      <form action="{{ url_for('main.follow', username=user.username) }}" method="post" class="mt-2">
+          {{ form.hidden_tag() }}
+          {{ form.submit(value=_('Follow'), class_='btn btn-outline-primary btn-sm') }}
+      </form>
+      {% else %}
+      <form action="{{ url_for('main.unfollow', username=user.username) }}" method="post" class="mt-2">
+          {{ form.hidden_tag() }}
+          {{ form.submit(value=_('Unfollow'), class_='btn btn-outline-primary btn-sm') }}
+      </form>
+      {% endif %}
+  {% endif %}
+</div>
