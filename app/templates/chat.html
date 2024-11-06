@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h3>Chat with {{ other_user.username }}</h3>
+
+    <div class="card mb-3">
+        <div class="card-body" style="max-height: 400px; overflow-y: scroll;">
+            {% for message in messages %}
+                <div class="d-flex {% if message.sender_id == current_user.id %}justify-content-end{% else %}justify-content-start{% endif %} mb-3">
+                    <div class="bg-light p-2 rounded">
+                        <strong>{{ message.sender.username }}:</strong> {{ message.body }}
+                        <small class="text-muted d-block">{{ moment(message.timestamp).fromNow() }}</small>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <form method="post" action="{{ url_for('main.chat', username=other_user.username) }}">
+        {{ form.hidden_tag() }}
+        <div class="form-group">
+            {{ form.message.label(class="form-label") }}
+            {{ form.message(class="form-control") }}
+        </div>
+        <button type="submit" class="btn btn-primary mt-2">Send</button>
+    </form>
+</div>
+{% endblock %}

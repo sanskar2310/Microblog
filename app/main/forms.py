@@ -46,3 +46,8 @@ class MessageForm(FlaskForm):
     message = TextAreaField(_l("Message"), validators=[
         DataRequired()])
     submit = SubmitField(_l("Send"))
+
+
+class FeedbackForm(FlaskForm):
+    content = TextAreaField('Feedback', validators=[DataRequired()])
+    submit = SubmitField('Submit Feedback')

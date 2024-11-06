@@ -2,18 +2,24 @@
 
 {% block content %}
     <h1>{{ _('Messages') }}</h1>
-    {% for post in messages %}
-        {% include '_post.html' %}
+    {% for message in messages %}
+        <div class="alert alert-secondary">
+            <strong>{{ message.author.username }} messaged to {{ message.recipient.username }}:</strong>
+            <br>
+            {{ message.body }}
+            <br>
+            <small class="text-muted">{{ moment(message.timestamp).fromNow() }}</small>
+        </div>
     {% endfor %}
     <nav aria-label="Post navigation">
         <ul class="pagination">
             <li class="page-item{% if not prev_url %} disabled{% endif %}">
-                <a class="page-link" href="#">
+                <a class="page-link" href="{{ prev_url }}">
                     <span aria-hidden="true">&larr;</span> {{ _('Newer messages') }}
                 </a>
             </li>
             <li class="page-item{% if not next_url %} disabled{% endif %}">
-                <a class="page-link" href="#">
+                <a class="page-link" href="{{ next_url }}">
                     {{ _('Older messages') }} <span aria-hidden="true">&rarr;</span>
                 </a>
             </li>

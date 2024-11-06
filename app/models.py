@@ -11,7 +11,15 @@ import jwt
 from app import db, login
 import json
 import secrets
+from sqlalchemy import Table, Column, Integer, ForeignKey
+from sqlalchemy.orm import relationship
 
+
+chat_users = Table('chat_users',
+    db.metadata,
+    Column('user_id', ForeignKey('user.id'), primary_key=True),
+    Column('chat_id', ForeignKey('chat.id'), primary_key=True)
+)
 
 class PaginatedAPIMixin(object):
     @staticmethod
@@ -77,7 +85,8 @@ class User(PaginatedAPIMixin, UserMixin, db.Model):
         foreign_keys='Message.recipient_id', back_populates='recipient')
     notifications: so.WriteOnlyMapped["Notification"] = so.relationship(
         back_populates="user")
-    
+    feedbacks = db.relationship('Feedback', back_populates='user')
+    chats: so.Mapped[so.relationship] = so.relationship('Chat', secondary=chat_users, back_populates='users')
 
     def __repr__(self):
         return '<User {}>'.format(self.username)
@@ -238,12 +247,25 @@ class Post(db.Model):
         return '<Post {}>'.format(self.body)
     
 
+class Chat(db.Model):
+    id: so.Mapped[int] = so.mapped_column(primary_key=True)
+    users: so.Mapped[so.relationship] = so.relationship('User', secondary='chat_users', back_populates='chats')
+    messages: so.WriteOnlyMapped['Message'] = so.relationship('Message', back_populates='chat', lazy='dynamic')
+
+
+class ChatUser(db.Model):
+    chat_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('chat.id'), primary_key=True)
+    user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('user.id'), primary_key=True)
+
+
 class Message(db.Model):
     id: so.Mapped[int] = so.mapped_column(primary_key=True)
     sender_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey(User.id),
                                                  index=True)
     recipient_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey(User.id),
                                                     index=True)
+    chat_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey(Chat.id), index=True)
+    chat: so.Mapped['Chat'] = so.relationship('Chat', back_populates='messages')
     body: so.Mapped[str] = so.mapped_column(sa.String(140))
     timestamp: so.Mapped[datetime] = so.mapped_column(
         index=True, default=lambda: datetime.now(timezone.utc))
@@ -254,9 +276,11 @@ class Message(db.Model):
     recipient: so.Mapped[User] = so.relationship(
         foreign_keys='Message.recipient_id',
         back_populates='messages_received')
+    chat: so.Mapped[Chat] = so.relationship(back_populates='messages')
 
     def __repr__(self):
         return "<Meassage {}>".format(self.body)
+    
 
 
 class Notification(db.Model):
@@ -271,3 +295,16 @@ class Notification(db.Model):
 
     def get_data(self):
         return json.loads(str(self.payload_json))
+
+
+class Feedback(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, index=True)
+
+    user = db.relationship('User', back_populates='feedbacks')
+
+@login.user_loader
+def load_user(id):
+    return db.session.get(User, int(id))

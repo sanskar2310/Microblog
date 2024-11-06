@@ -1,14 +1,14 @@
 from datetime import datetime, timezone
 from flask import render_template, flash, redirect, url_for, request, g, \
-    current_app, abort
+    current_app, abort, jsonify
 from flask_login import current_user, login_required
 from flask_babel import _, get_locale
 import sqlalchemy as sa
 from app import db
 import os
 from app.main.forms import EditProfileForm, EmptyForm, PostForm, DeletePostForm, \
-    MessageForm
-from app.models import User, Post, Message, Notification
+    MessageForm, FeedbackForm
+from app.models import User, Post, Message, Notification, Chat, Feedback
 from app.main import bp
 from werkzeug.utils import secure_filename
 
@@ -186,18 +186,15 @@ def user_popup(username):
     form = EmptyForm()
     return render_template("user_popup.html", user=user, form=form)
 
-
 @bp.route('/send_message/<recipient>', methods=['GET', 'POST'])
 @login_required
 def send_message(recipient):
     user = db.first_or_404(sa.select(User).where(User.username == recipient))
     form = MessageForm()
     if form.validate_on_submit():
-        msg = Message(author=current_user, recipient=user,
-                      body=form.message.data)
+        msg = Message(author=current_user, recipient=user, body=form.message.data)
         db.session.add(msg)
-        user.add_notification('unread_message_count',
-                              user.unread_message_count())
+        user.add_notification('unread_message_count', user.unread_message_count())
         db.session.commit()
         flash(_('Your message has been sent.'))
         return redirect(url_for('main.user', username=recipient))
@@ -205,24 +202,27 @@ def send_message(recipient):
     return render_template('send_message.html', title=_('Send Message'),
                            form=form, recipient=recipient)
 
-
 @bp.route('/messages')
 @login_required
 def messages():
     current_user.last_message_read_time = datetime.now(timezone.utc)
     current_user.add_notification('unread_message_count', 0)
     db.session.commit()
+    
     page = request.args.get('page', 1, type=int)
-    query = current_user.messages_received.select().order_by(
-        Message.timestamp.desc())
+    
+    # Query to get both received and sent messages
+    query = db.session.query(Message).filter(
+        (Message.recipient_id == current_user.id) | (Message.sender_id == current_user.id)
+    ).order_by(Message.timestamp.desc())
+    
     messages = db.paginate(query, page=page,
                            per_page=current_app.config['POSTS_PER_PAGE'],
                            error_out=False)
-    print(f"Retrieved messages: {messages.items}")
-    next_url = url_for('main.messages', page=messages.next_num) \
-        if messages.has_next else None
-    prev_url = url_for('main.messages', page=messages.prev_num) \
-        if messages.has_prev else None
+    
+    next_url = url_for('main.messages', page=messages.next_num) if messages.has_next else None
+    prev_url = url_for('main.messages', page=messages.prev_num) if messages.has_prev else None
+    
     return render_template('messages.html', messages=messages.items,
                            next_url=next_url, prev_url=prev_url)
 
@@ -262,3 +262,62 @@ def following(username):
     next_url = url_for('main.following', username=user.username, page=following.next_num) if following.has_next else None
     prev_url = url_for('main.following', username=user.username, page=following.prev_num) if following.has_prev else None
     return render_template('following.html', user=user, following=following.items, next_url=next_url, prev_url=prev_url)
+
+
+@bp.route('/feedback', methods=['GET', 'POST'])
+@login_required
+def feedback():
+    form = FeedbackForm()  # Create an instance of your feedback form
+    if form.validate_on_submit():
+        content = form.content.data
+        feedback = Feedback(user_id=current_user.id, content=content)
+        db.session.add(feedback)
+        db.session.commit()
+        flash('Your feedback has been submitted.')
+        return redirect(url_for('main.user', username=current_user.username))
+    feedback_list = Feedback.query.all()
+    return render_template('feedback.html', form=form, feedback_list=feedback_list)
+
+
+@bp.route('/delete_all_feedback', methods=['POST'])
+@login_required
+def delete_all_feedback():
+    Feedback.query.filter_by(user_id=current_user.id).delete()
+    db.session.commit()
+    flash('All your feedback has been deleted.')
+    return redirect(url_for('main.feedback'))
+
+
+@bp.route('/chat/<username>', methods=['GET', 'POST'])
+@login_required
+def chat(username):
+    user = db.session.execute(sa.select(User).where(User.username == username)).scalar_one_or_none()
+    if user is None or user == current_user:
+        flash('Invalid user')
+        return redirect(url_for('main.messages'))
+
+    # Check if a chat between these users already exists
+    chat = db.session.query(Chat).filter(
+        (Chat.user1_id == current_user.id) & (Chat.user2_id == user.id) |
+        (Chat.user1_id == user.id) & (Chat.user2_id == current_user.id)
+    ).first()
+
+    # If no chat exists, create a new one
+    if chat is None:
+        chat = Chat(user1=current_user, user2=user)
+        db.session.add(chat)
+        db.session.commit()
+
+    # Load messages for this chat
+    page = request.args.get('page', 1, type=int)
+    messages = chat.messages.order_by(Message.timestamp.desc()).paginate(page=page, per_page=10)
+
+    # Message form submission handling
+    form = MessageForm()
+    if form.validate_on_submit():
+        msg = Message(sender_id=current_user.id, chat_id=chat.id, body=form.message.data)
+        db.session.add(msg)
+        db.session.commit()
+        return redirect(url_for('main.chat', username=username))
+
+    return render_template('chat.html', chat=chat, messages=messages.items, form=form, other_user=user)

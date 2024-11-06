@@ -38,13 +38,6 @@
                         </form>
                     </p>
                     {% endif %}
-                    {% if user != current_user %}
-                    <p>
-                        <a href="{{ url_for('main.send_message', recipient=user.username) }}" class="btn btn-outline-secondary">
-                            {{ _('Send private message') }}
-                        </a>
-                    </p>           
-                    {% endif %}
         </div>
     </div>
     </div>
