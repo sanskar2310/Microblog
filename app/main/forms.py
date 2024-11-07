@@ -37,7 +37,7 @@ class DeletePostForm(FlaskForm):
 
 class PostForm(FlaskForm):
     post = TextAreaField(_l("Say Something"), validators=[
-        DataRequired(), Length(min=1, max=300)
+        DataRequired(), Length(min=1, max=5000)
     ]) 
     submit = SubmitField(_l("Submit"))
 
@@ -49,5 +49,7 @@ class MessageForm(FlaskForm):
 
 
 class FeedbackForm(FlaskForm):
-    content = TextAreaField('Feedback', validators=[DataRequired()])
+    content = TextAreaField('Feedback', validators=[
+        DataRequired(), Length(min=1, max=1000)
+        ])
     submit = SubmitField('Submit Feedback')

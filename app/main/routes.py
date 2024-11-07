@@ -90,7 +90,6 @@ def user(username):
 def edit_profile():
     form = EditProfileForm(current_user.username)
     if form.validate_on_submit():
-        # Update user information
         current_user.username = form.username.data
         current_user.about_me = form.about_me.data
         # Handle file upload
@@ -107,7 +106,7 @@ def edit_profile():
             current_user.avatar_filename = filename
         db.session.commit()
         flash('Your changes have been saved.')
-        return redirect(url_for('main.edit_profile'))
+        return redirect(url_for('main.user', username=current_user.username))
     elif request.method == 'GET':
         form.username.data = current_user.username
         form.about_me.data = current_user.about_me
@@ -210,8 +209,6 @@ def messages():
     db.session.commit()
     
     page = request.args.get('page', 1, type=int)
-    
-    # Query to get both received and sent messages
     query = db.session.query(Message).filter(
         (Message.recipient_id == current_user.id) | (Message.sender_id == current_user.id)
     ).order_by(Message.timestamp.desc())
@@ -267,7 +264,7 @@ def following(username):
 @bp.route('/feedback', methods=['GET', 'POST'])
 @login_required
 def feedback():
-    form = FeedbackForm()  # Create an instance of your feedback form
+    form = FeedbackForm()
     if form.validate_on_submit():
         content = form.content.data
         feedback = Feedback(user_id=current_user.id, content=content)
@@ -279,14 +276,17 @@ def feedback():
     return render_template('feedback.html', form=form, feedback_list=feedback_list)
 
 
-@bp.route('/delete_all_feedback', methods=['POST'])
+@bp.route('/delete_feedback/<int:feedback_id>', methods=['POST'])
 @login_required
-def delete_all_feedback():
-    Feedback.query.filter_by(user_id=current_user.id).delete()
+def delete_feedback(feedback_id):
+    feedback = Feedback.query.get_or_404(feedback_id)
+    if feedback.user_id != current_user.id:
+        flash('You are not authorized to delete this feedback.')
+        return redirect(url_for('main.feedback'))
+    db.session.delete(feedback)
     db.session.commit()
-    flash('All your feedback has been deleted.')
+    flash('Feedback deleted successfully.')
     return redirect(url_for('main.feedback'))
-
 
 @bp.route('/chat/<username>', methods=['GET', 'POST'])
 @login_required
@@ -295,24 +295,16 @@ def chat(username):
     if user is None or user == current_user:
         flash('Invalid user')
         return redirect(url_for('main.messages'))
-
-    # Check if a chat between these users already exists
     chat = db.session.query(Chat).filter(
         (Chat.user1_id == current_user.id) & (Chat.user2_id == user.id) |
         (Chat.user1_id == user.id) & (Chat.user2_id == current_user.id)
     ).first()
-
-    # If no chat exists, create a new one
     if chat is None:
         chat = Chat(user1=current_user, user2=user)
         db.session.add(chat)
         db.session.commit()
-
-    # Load messages for this chat
     page = request.args.get('page', 1, type=int)
     messages = chat.messages.order_by(Message.timestamp.desc()).paginate(page=page, per_page=10)
-
-    # Message form submission handling
     form = MessageForm()
     if form.validate_on_submit():
         msg = Message(sender_id=current_user.id, chat_id=chat.id, body=form.message.data)
@@ -325,18 +317,11 @@ def chat(username):
 @bp.route('/like/<int:post_id>', methods=['POST'])
 @login_required
 def like_post(post_id):
-    post = Post.query.get_or_404(post_id)
-    
-    # Check if the user has already liked the post
     like = Like.query.filter_by(user_id=current_user.id, post_id=post_id).first()
-    
     if like:
-        # If a like exists, unlike the post (remove like record)
         db.session.delete(like)
     else:
-        # If not liked, add a like record
         like = Like(user_id=current_user.id, post_id=post_id)
         db.session.add(like)
-    
     db.session.commit()
     return redirect(request.referrer or url_for('main.index'))
