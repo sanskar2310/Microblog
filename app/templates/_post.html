@@ -21,7 +21,6 @@
             {{ post.body }}
             
             <div class="like-unlike-buttons" style="display: flex; gap: 10px;">
-                <!-- Like/Unlike Button -->
                 <form action="{{ url_for('main.like_post', post_id=post.id) }}" method="POST">
                     <button type="submit" 
                             style="color: {% if current_user.has_liked(post) %}blue{% else %}black{% endif %}; 
@@ -32,7 +31,7 @@
                                    border-radius: 5px;
                                    transition: color 0.3s, border-color 0.3s;">
                         <i class="fas fa-thumbs-up"></i> 
-                        {% if current_user.has_liked(post) %}liked{% else %}Like{% endif %}
+                        {% if current_user.has_liked(post) %}Liked{% else %}Like{% endif %}
                     </button>
                 </form>
             </div>
