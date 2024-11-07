@@ -8,7 +8,7 @@ from app import db
 import os
 from app.main.forms import EditProfileForm, EmptyForm, PostForm, DeletePostForm, \
     MessageForm, FeedbackForm
-from app.models import User, Post, Message, Notification, Chat, Feedback
+from app.models import User, Post, Message, Notification, Chat, Feedback, Like
 from app.main import bp
 from werkzeug.utils import secure_filename
 
@@ -321,3 +321,22 @@ def chat(username):
         return redirect(url_for('main.chat', username=username))
 
     return render_template('chat.html', chat=chat, messages=messages.items, form=form, other_user=user)
+
+@bp.route('/like/<int:post_id>', methods=['POST'])
+@login_required
+def like_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    
+    # Check if the user has already liked the post
+    like = Like.query.filter_by(user_id=current_user.id, post_id=post_id).first()
+    
+    if like:
+        # If a like exists, unlike the post (remove like record)
+        db.session.delete(like)
+    else:
+        # If not liked, add a like record
+        like = Like(user_id=current_user.id, post_id=post_id)
+        db.session.add(like)
+    
+    db.session.commit()
+    return redirect(request.referrer or url_for('main.index'))

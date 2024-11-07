@@ -19,6 +19,26 @@
                 username=user_link, when=moment(post.timestamp).fromNow()) }}
             <br>
             {{ post.body }}
+            
+            <div class="like-unlike-buttons" style="display: flex; gap: 10px;">
+                <!-- Like/Unlike Button -->
+                <form action="{{ url_for('main.like_post', post_id=post.id) }}" method="POST">
+                    <button type="submit" 
+                            style="color: {% if current_user.has_liked(post) %}blue{% else %}black{% endif %}; 
+                                   background-color: transparent; 
+                                   border: 1px solid {% if current_user.has_liked(post) %}blue{% else %}black{% endif %}; 
+                                   padding: 5px 10px; 
+                                   cursor: pointer; 
+                                   border-radius: 5px;
+                                   transition: color 0.3s, border-color 0.3s;">
+                        <i class="fas fa-thumbs-up"></i> 
+                        {% if current_user.has_liked(post) %}liked{% else %}Like{% endif %}
+                    </button>
+                </form>
+            </div>
+            
+            <p style="font-weight: bold; margin: 5px 0; color: #333;">Likes: {{ post.likes|length }}</p>
+            
             <div class="post">
                 {% if post.author == current_user %}
                 <form action="{{ url_for('main.delete_post', post_id=post.id) }}" method="post" class="delete-form">

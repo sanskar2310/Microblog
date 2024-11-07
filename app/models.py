@@ -87,6 +87,7 @@ class User(PaginatedAPIMixin, UserMixin, db.Model):
         back_populates="user")
     feedbacks = db.relationship('Feedback', back_populates='user')
     chats: so.Mapped[so.relationship] = so.relationship('Chat', secondary=chat_users, back_populates='users')
+    likes = db.relationship('Like', back_populates='user', cascade='all, delete-orphan')
 
     def __repr__(self):
         return '<User {}>'.format(self.username)
@@ -175,6 +176,10 @@ class User(PaginatedAPIMixin, UserMixin, db.Model):
             self.posts.select().subquery())
         return db.session.scalar(query)
     
+    def has_liked(self, post):
+        return Like.query.filter_by(user_id=self.id, post_id=post.id).first() is not None
+    
+    
     def to_dict(self, include_email=False):
         data = {
             'id': self.id,
@@ -241,7 +246,7 @@ class Post(db.Model):
                                                index=True)
 
     author: so.Mapped[User] = so.relationship(back_populates='posts')
-    
+    likes = db.relationship('Like', back_populates='post', cascade='all, delete-orphan')
     
     def __repr__(self):
         return '<Post {}>'.format(self.body)
@@ -308,3 +313,16 @@ class Feedback(db.Model):
 @login.user_loader
 def load_user(id):
     return db.session.get(User, int(id))
+
+
+
+class Like(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+    
+    user = db.relationship('User', back_populates='likes')
+    post = db.relationship('Post', back_populates='likes')
+
+    def __repr__(self):
+        return f'<Like {self.id}>'
